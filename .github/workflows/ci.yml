@@ -12,33 +12,32 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v2  # Используем актуальную версию v2
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v2  # Используем актуальную версию v2
         with:
           python-version: '3.11'
 
+      - name: Install GoogleTest
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtest-dev
+          cd /usr/src/gtest
+          sudo cmake CMakeLists.txt
+          sudo make
+          sudo cp libgtest.a /usr/lib
 
-    - name: Install GoogleTest
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libgtest-dev
-        cd /usr/src/gtest
-        sudo cmake CMakeLists.txt
-        sudo make
-        sudo cp libgtest.a /usr/lib
-
-    
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y cmake g++ make lcov
 
-#      - name: Install Python dependencies
-#        run: |
-#          python3 -m pip install --upgrade pip
-#          pip3 install -r requirements.txt
+      # Устанавливать Python-зависимости, если они есть, можно раскомментировать
+      # - name: Install Python dependencies
+      #   run: |
+      #     python3 -m pip install --upgrade pip
+      #     pip3 install -r requirements.txt
 
       - name: Run CMake build
         run: |
@@ -53,7 +52,7 @@ jobs:
 
       - name: Upload coverage HTML report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v2  # Используем актуальную версию v2
         with:
           name: coverage-html
           path: build/coverage_html
