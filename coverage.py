@@ -105,8 +105,10 @@ def prepare_deps(allow_install=True):
 def configure(project_dir: Path, build_dir: Path, build_type: str, enable_coverage: bool):
     build_dir.mkdir(parents=True, exist_ok=True)
 
-    base = ["cmake", "-S", str(project_dir), "-B", str(build_dir), f"-DCMAKE_BUILD_TYPE={build_type}"]
+    # Основная команда CMake
+    base = ["cmake", "-S", str(project_dir), "-B", str(build_dir), f"-DCMAKE_BUILD_TYPE={build_type}", "-DENABLE_COVERAGE=ON"]
 
+    # Если не нужно включать покрытие, просто запускаем базовую команду
     if not enable_coverage:
         run(base)
         return
@@ -114,6 +116,7 @@ def configure(project_dir: Path, build_dir: Path, build_type: str, enable_covera
     cmake_txt = (project_dir / "CMakeLists.txt").read_text(encoding="utf-8")
     has_opt = ("option(" in cmake_txt) and ("ENABLE_COVERAGE" in cmake_txt)
 
+    # Если опция ENABLE_COVERAGE уже есть в CMakeLists.txt, то передаем флаг
     if has_opt:
         run(base + ["-DENABLE_COVERAGE=ON"])
     else:
@@ -123,6 +126,7 @@ def configure(project_dir: Path, build_dir: Path, build_type: str, enable_covera
             "-DCMAKE_EXE_LINKER_FLAGS_DEBUG=--coverage",
             "-DCMAKE_SHARED_LINKER_FLAGS_DEBUG=--coverage",
         ])
+
 
 def build(build_dir: Path, jobs: int):
     run(["cmake", "--build", str(build_dir), "-j", str(jobs)])
@@ -142,9 +146,19 @@ def run_ctest(build_dir: Path) -> bool:
     return rc == 0
 
 def collect_coverage(build_dir: Path, remove_masks):
-    run(["lcov", "--directory", ".", "--capture", "--output-file", "coverage.info"], cwd=str(build_dir))
+    run(["lcov", "--directory", ".", "--capture", "--output-file", "coverage.info", "--ignore-errors", "inconsistent", "--ignore-errors", "unused"], cwd=str(build_dir))
+
+    remove_masks.extend([
+        "/usr/include/gtest/*",
+        "/usr/lib/gtest/*",
+        "*/gtest/*",             
+        "*/gtest/internal/*",    
+        "*/CMakeFiles/*"         
+    ])
+
     for m in remove_masks:
-        run(["lcov", "--remove", "coverage.info", m, "--output-file", "coverage.info"], cwd=str(build_dir))
+        run(["lcov", "--remove", "coverage.info", "--output-file", "coverage.info", "--ignore-errors", "unused"], cwd=str(build_dir))
+        
     out_dir = build_dir / "coverage_html"
     if out_dir.exists():
         shutil.rmtree(out_dir)
@@ -233,6 +247,9 @@ def main():
 
     project_dir = Path(args.project_dir).resolve()
     build_dir = Path(args.build_dir).resolve()
+
+    cleanup_coverage_files(project_dir)
+    
     cmake_file = project_dir / "CMakeLists.txt"
     make_upper = project_dir / "Makefile"
     make_lower = project_dir / "makefile"
